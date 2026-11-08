@@ -102,8 +102,4 @@ Mpox Skin Lesion Dataset Version 2.0 (MSLD v2.0), Kaggle:
 
 https://www.kaggle.com/datasets/joydippaul/mpox-skin-lesion-dataset-version-20-msld-v20
 
-## Citation
 
-If you use this code, please cite:
-
-> L. H. Elmenshawi, et al., "ConvNeXt-SE: An Explainable Deep Transfer Learning Framework for Multiclass Mpox-Related Skin Lesion Classification," *under review*.
