@@ -13,7 +13,7 @@ The `Dataset` folder contains information about the image data used in this stud
 The study uses the **Mpox Skin Lesion Dataset Version 2.0 (MSLD v2.0)**:
 
 * **Classes (6):** Monkeypox, Chickenpox, Cowpox, Hand-Foot-and-Mouth Disease (HFMD), Measles, Healthy
-* **Images:** 755 original clinical images (754 unique after removal of one exact duplicate)
+* **Images:** 755 original clinical images 
 * **Source:** Kaggle – Mpox Skin Lesion Dataset Version 2.0 (MSLD v2.0)
 * **Reference:** S. N. Ali et al., *Biomedical Signal Processing and Control*, 2024, doi: 10.1016/j.bspc.2024.106742
 
