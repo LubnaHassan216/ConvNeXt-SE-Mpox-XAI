@@ -1,29 +1,6 @@
-"""
-ConvNeXt-SE: An Explainable Deep Transfer Learning Framework for
-Multiclass Mpox-Related Skin Lesion Classification (MSLD v2.0, six classes)
 
-Full implementation of the pipeline described in the paper:
-  Sec. 3.1  Data loading (original clinical images only, exact-duplicate removal)
-  Sec. 3.2  Online data augmentation (training split only)
-  Sec. 3.3  ConvNeXt-Base backbone + Squeeze-and-Excitation block + custom head
-  Sec. 3.4  Class-weighted cross-entropy + label smoothing; two-stage fine-tuning
-  Sec. 3.5  Six-view Test-Time Augmentation (TTA) ensemble
-  Sec. 4.2  Accuracy, macro precision / recall / F1, per-class and macro ROC-AUC
-  Sec. 5.1  Repeated stratified 5-fold cross-validation (3 repeats = 15 folds)
-  Sec. 5.3  Independent held-out test evaluation (70/15/15 split)
-  Sec. 5.4  Cumulative ablation study + individual TTA views
-  Sec. 5.5  Grad-CAM visual explanations
 
-Usage (Google Colab):
-  !pip install -q grad-cam
-  !python convnext_se_mpox.py --data /content/drive/MyDrive/FOLDS/Fold_1 --mode all
-Modes: cv | holdout | ablation | gradcam | all
---data may be either
-  (a) a folder with train/ val/ test/ sub-folders, each containing one folder per class
-      (all splits are pooled and re-split by this script), or
-  (b) a folder containing one sub-folder per class.
-All outputs are written to --out (default: ./outputs).
-"""
+
 
 import argparse
 import copy
@@ -53,9 +30,7 @@ from sklearn.metrics import (accuracy_score, precision_recall_fscore_support,
 from sklearn.preprocessing import label_binarize
 
 
-# ============================================================================
-# Configuration (Table 5 of the paper)
-# ============================================================================
+
 CFG = dict(
     img_size=224,            # network input
     resize=256,              # resize before crop
@@ -94,9 +69,8 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-# ============================================================================
-# Sec. 3.1  Dataset: original clinical images, exact duplicates removed
-# ============================================================================
+
+
 def md5(path, chunk=1 << 20):
     h = hashlib.md5()
     with open(path, "rb") as f:
@@ -137,9 +111,7 @@ def load_dataset(root):
     return paths, labels, class_names
 
 
-# ============================================================================
-# Sec. 3.2  Online augmentation (Table 3) and evaluation transform
-# ============================================================================
+
 train_tf = transforms.Compose([
     transforms.Resize((CFG["resize"], CFG["resize"])),
     transforms.RandomResizedCrop(CFG["img_size"], scale=(0.75, 1.0), ratio=(0.90, 1.10)),
@@ -179,9 +151,7 @@ def make_loader(paths, labels, transform, shuffle, repeat=1):
                       num_workers=CFG["num_workers"], pin_memory=(DEVICE == "cuda"))
 
 
-# ============================================================================
-# Sec. 3.3  ConvNeXt-SE architecture
-# ============================================================================
+
 class SEBlock(nn.Module):
     """Squeeze-and-Excitation (Eqs. 1-3): GAP -> FC(C->C/r) -> ReLU -> FC(C/r->C) -> Sigmoid."""
     def __init__(self, channels, reduction=16):
@@ -246,9 +216,7 @@ def set_stage(model, stage):
         p.requires_grad = True
 
 
-# ============================================================================
-# Sec. 3.4  Loss: class-weighted cross-entropy (Eqs. 6-7) + label smoothing (Eq. 8)
-# ============================================================================
+
 def class_weights(train_labels, num_classes):
     counts = np.bincount(train_labels, minlength=num_classes).astype(float)
     w = counts.sum() / (num_classes * counts)      # w_c = N / (C * n_c)
@@ -262,9 +230,7 @@ def make_criterion(train_labels, num_classes, weighted=True, smoothing=True):
         label_smoothing=CFG["label_smoothing"] if smoothing else 0.0)
 
 
-# ============================================================================
-# Training / evaluation
-# ============================================================================
+
 def macro_scores(y, p):
     acc = accuracy_score(y, p)
     pr, rc, f1, _ = precision_recall_fscore_support(y, p, average="macro", zero_division=0)
@@ -351,9 +317,7 @@ def train_model(tr_p, tr_y, va_p, va_y, num_classes, use_se=True, weighted=True,
     return model, criterion
 
 
-# ============================================================================
-# Sec. 3.5  Six-view Test-Time Augmentation (Eq. 9)
-# ============================================================================
+
 TTA_VIEWS = {
     "Original_CenterCrop": lambda im: im,
     "Horizontal_Flip": TF.hflip,
@@ -378,9 +342,7 @@ def evaluate_tta(model, paths, labels):
     return y, per_view, ensemble
 
 
-# ============================================================================
-# Reporting helpers
-# ============================================================================
+
 def full_metrics(y, probs, class_names):
     pred = probs.argmax(1)
     acc, pr, rc, f1 = macro_scores(y, pred)
@@ -435,9 +397,7 @@ def holdout_split(paths, labels, seed):
     return tr_p, tr_y, va_p, va_y, te_p, te_y
 
 
-# ============================================================================
-# Sec. 5.1  Repeated stratified 5-fold cross-validation (3 x 5 = 15 folds)
-# ============================================================================
+
 def run_cv(paths, labels, class_names, out, pretrained=True):
     rows, history = [], []
     for r in range(1, CFG["n_repeats"] + 1):
@@ -496,9 +456,7 @@ def run_cv(paths, labels, class_names, out, pretrained=True):
     return summary
 
 
-# ============================================================================
-# Sec. 5.3  Held-out test evaluation (+ TTA, ROC-AUC, Table 11)
-# ============================================================================
+
 def run_holdout(paths, labels, class_names, out, seed, pretrained=True):
     set_seed(seed)
     tr_p, tr_y, va_p, va_y, te_p, te_y = holdout_split(paths, labels, seed)
@@ -543,9 +501,7 @@ def run_holdout(paths, labels, class_names, out, seed, pretrained=True):
     return model, (te_p, te_y), result
 
 
-# ============================================================================
-# Sec. 5.4  Cumulative ablation (Table 10), averaged over seeds
-# ============================================================================
+
 ABLATION = [  # name, use_se, label_smoothing, weighted_loss, tta
     ("ConvNeXt baseline",     False, False, False, False),
     ("+ SE block",            True,  False, False, False),
@@ -586,9 +542,7 @@ def run_ablation(paths, labels, class_names, out, seeds, pretrained=True):
     return table
 
 
-# ============================================================================
-# Sec. 5.5  Grad-CAM (Eqs. 16-17)
-# ============================================================================
+
 def run_gradcam(model, test_set, class_names, out, per_class=1):
     try:
         from pytorch_grad_cam import GradCAM
@@ -625,9 +579,7 @@ def run_gradcam(model, test_set, class_names, out, per_class=1):
     print("Saved Grad-CAM figure:", out / "gradcam_examples.png")
 
 
-# ============================================================================
-# Main
-# ============================================================================
+
 def main():
     ap = argparse.ArgumentParser(description="ConvNeXt-SE for MSLD v2.0")
     ap.add_argument("--data", required=True)
